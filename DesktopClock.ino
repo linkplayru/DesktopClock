@@ -37,6 +37,9 @@ byte lcd_char_n4[8] = {B11111, B00011, B00011, B00011, B00011, B00011, B00011, B
 byte lcd_char_n5[8] = {B11111, B11000, B11000, B11000, B11000, B11000, B11000, B11111};
 byte lcd_char_n6[8] = {B11111, B00011, B00011, B00011, B00011, B00011, B00011, B00011};
 byte lcd_char_n7[8] = {B11111, B11011, B11011, B11011, B11011, B11011, B11011, B11111};
+byte lcd_char_aqiInit[8] = {B00100, B01100, B00100, B01110, B00000, B01110, B01010, B01110};
+byte lcd_char_aqiWarm[8] = {B00000, B00100, B01010, B10101, B11011, B10101, B01110, B00000};
+byte lcd_char_aqiError[8] = {B11111, B10000, B10000, B11111, B10000, B10000, B11111, B00000};
 byte lcd_char_aqi1[8] = {B00000, B00000, B01010, B01010, B00000, B10001, B01110, B01100};
 byte lcd_char_aqi2[8] = {B00000, B00000, B01010, B01010, B00000, B10001, B01110, B00000};
 byte lcd_char_aqi3[8] = {B00000, B00000, B01010, B01010, B00000, B00000, B11111, B00000};
@@ -128,8 +131,7 @@ void lcdPrintMain(float temp, float hum, uint16_t co2, uint8_t wifiStatus, uint8
   lcdPrintHumidity(hum, 6, 0);
   lcdPrintCO2(co2, 9, 1);
   lcdPrintAlarm(wifiStatus, 6, 1);
-  lcdPrintAQI(aqi, 7, 1);
-  lcdPrintENSStatus(ensStatus, 8, 1);
+  lcdPrintAQI(aqi, ensStatus, 7, 1);
 }
 
 void lcdPrintTime(uint8_t pos) {
@@ -188,25 +190,23 @@ void lcdPrintAlarm(uint8_t wifiStatus, uint8_t posX, uint8_t posY) {
   }
 }
 
-void lcdPrintAQI(uint8_t aqi, uint8_t posX, uint8_t posY) {
-  switch (aqi) {
-    case 1: lcd.createChar(8, lcd_char_aqi1); break;
-    case 2: lcd.createChar(8, lcd_char_aqi2); break;
-    case 3: lcd.createChar(8, lcd_char_aqi3); break;
-    case 4: lcd.createChar(8, lcd_char_aqi4); break;
-    case 5: lcd.createChar(8, lcd_char_aqi5); break;
+void lcdPrintAQI(uint8_t aqi, int8_t ensStatus, uint8_t posX, uint8_t posY) {
+  switch (ensStatus) {
+    case 0:
+      switch (aqi) {
+        case 1: lcd.createChar(8, lcd_char_aqi1); break;
+        case 2: lcd.createChar(8, lcd_char_aqi2); break;
+        case 3: lcd.createChar(8, lcd_char_aqi3); break;
+        case 4: lcd.createChar(8, lcd_char_aqi4); break;
+        case 5: lcd.createChar(8, lcd_char_aqi5); break;
+      }
+      break;
+    case 1: lcd.createChar(8, lcd_char_aqiWarm); break;
+    case 2: lcd.createChar(8, lcd_char_aqiInit); break;
+    case -1: lcd.createChar(8, lcd_char_aqiError); break;
   }
   lcd.setCursor(posX, posY);
   lcd.write(8);
-}
-
-void lcdPrintENSStatus(int8_t ensStatus, uint8_t posX, uint8_t posY) {
-  lcd.setCursor(posX, posY);
-  if (ensStatus != 0) {
-    lcd.print(ensStatus);
-  } else {
-    lcd.write(32);
-  }
 }
 
 void wifiInit() {
