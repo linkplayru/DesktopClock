@@ -4,9 +4,12 @@
 #include <SparkFun_ENS160.h>
 #include <SparkFun_Qwiic_Humidity_AHT20.h>
 #include <DHT.h>
+#include <PubSubClient.h>
 
 unsigned long wifiTaskPrevMillis = 0;
 unsigned long wifiTaskCheckInterval = 10000;
+unsigned long mqttTaskPrevMillis = 0;
+unsigned long mqttTaskCheckInterval = 1000;
 unsigned long ntpTaskPrevMillis = 0;
 unsigned long ntpTaskCheckInterval = 100;
 unsigned long ensTaskPrevMillis = 0;
@@ -27,6 +30,17 @@ uint8_t wifiStatus;
 const char* ntpServer = "pool.ntp.org";
 const long ntpOffset = 10800;
 struct tm ntpTime;
+
+//MQTT
+const char* mqttBroker = "broker";
+const char* mqttTopic = "topic";
+const char* mqttUser = "user";
+const char* mqttPassword = "password";
+const int mqttPort = 1883;
+bool mqttStatus;
+WiFiClient wifiClient;
+PubSubClient mqttClient(wifiClient);
+char mqttBuffer[400];
 
 //LCD
 LiquidCrystal_I2C lcd(0x27,16,2);
@@ -130,7 +144,7 @@ void lcdPrintMain(float temp, float hum, uint16_t co2, uint8_t wifiStatus, uint8
   lcdPrintTemperature(temp, 9, 0);
   lcdPrintHumidity(hum, 6, 0);
   lcdPrintCO2(co2, 9, 1);
-  lcdPrintAlarm(wifiStatus, 6, 1);
+  lcdPrintAlarm(wifiStatus, mqttStatus, 6, 1);
   lcdPrintAQI(aqi, ensStatus, 7, 1);
 }
 
@@ -181,10 +195,12 @@ void lcdPrintCO2(uint16_t co2, uint8_t posX, uint8_t posY) {
   lcd.print("ppm");
 }
 
-void lcdPrintAlarm(uint8_t wifiStatus, uint8_t posX, uint8_t posY) {
+void lcdPrintAlarm(uint8_t wifiStatus, bool mqttStatus, uint8_t posX, uint8_t posY) {
   lcd.setCursor(posX, posY);
   if (wifiStatus != WL_CONNECTED) {
     lcd.write(33);
+  } else if (!mqttStatus) {
+    lcd.write(42);
   } else {
     lcd.write(32);
   }
@@ -221,6 +237,50 @@ void wifiInit() {
 
 void wifiCheck() {
   wifiStatus = WiFi.status();
+}
+
+void mqttInit() {
+  mqttClient.setBufferSize(400);
+  mqttClient.setServer(mqttBroker, mqttPort);
+}
+
+void mqttCheck() {
+  while(!mqttClient.connected()) {
+    mqttStatus = 0;
+    if (!mqttClient.connect("DesktopClock", mqttUser, mqttPassword)) {
+      delay(500);
+    }
+  }
+  mqttStatus = 1;
+  mqttClient.loop();
+  mqttSend();
+}
+
+void mqttSend() {
+  snprintf(mqttBuffer, sizeof(mqttBuffer),
+  "{\n"
+  "  \"year\": %d,\n"
+  "  \"month\": %d,\n"
+  "  \"day\": %d,\n"
+  "  \"hour\": %d,\n"
+  "  \"minute\": %d,\n"
+  "  \"second\": %d,\n"
+  "  \"weekDay\": %d,\n"
+  "  \"yearDay\": %d,\n"
+  "  \"ensStatus\": %d,\n"
+  "  \"ensAQI\": %d,\n"
+  "  \"ensTVOC\": %d,\n"
+  "  \"ensECO2\": %d,\n"
+  "  \"ahtStatus\": %d,\n"
+  "  \"ahtTemp\": %0.1f,\n"
+  "  \"ahtHum\": %0.1f,\n"
+  "  \"dhtTemp\": %0.1f,\n"
+  "  \"dhtHum\": %0.1f\n"
+  "}"
+  ,
+  ntpTime.tm_year + 1900, ntpTime.tm_mon + 1, ntpTime.tm_mday, ntpTime.tm_hour, ntpTime.tm_min, ntpTime.tm_sec, ntpTime.tm_wday + 1, ntpTime.tm_yday + 1
+  , ensStatus, ensAQI, ensTVOC, ensECO2, ahtStatus, ahtTemp, ahtHum, dhtTemp, dhtHum);
+  mqttClient.publish(mqttTopic, mqttBuffer);
 }
 
 void ntpInit() {
@@ -290,6 +350,7 @@ void setup() {
   lcdInit();
   lcdPrintConnectingWifi();
   wifiInit();
+  mqttInit();
   lcdPrintGettingTime();
   ntpInit();
   lcdPrintInitENS();
@@ -308,6 +369,10 @@ void loop() {
   if (currMillis - wifiTaskPrevMillis > wifiTaskCheckInterval) {
     wifiCheck();
     wifiTaskPrevMillis = currMillis;
+  }
+  if (currMillis - mqttTaskPrevMillis > mqttTaskCheckInterval) {
+    mqttCheck();
+    mqttTaskPrevMillis = currMillis;
   }
   if (currMillis - ntpTaskPrevMillis > ntpTaskCheckInterval) {
     ntpRead();
