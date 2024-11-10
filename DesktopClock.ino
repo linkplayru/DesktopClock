@@ -237,8 +237,6 @@ void ntpRead()
 
 void ensInit() {
   if(ens.begin()) {
-    ens.setOperatingMode(SFE_ENS160_RESET);
-    delay(100);
     ens.setOperatingMode(SFE_ENS160_STANDARD);
   } else {
     ensStatus = -1;
