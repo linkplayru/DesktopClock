@@ -39,6 +39,8 @@ const char* mqttUser = "user";
 const char* mqttPassword = "password";
 const int mqttPort = 1883;
 bool mqttStatus;
+
+//WIFI
 WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);
 char mqttBuffer[400];
@@ -305,6 +307,8 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     lcdBacklightOff();
   } else if (message == "backlight on") {
     lcdBacklightOn();
+  } else if (message == "ens reset") {
+    ensReset();
   }
 }
 
@@ -325,6 +329,13 @@ void ensInit() {
     ens.setOperatingMode(SFE_ENS160_STANDARD);
   } else {
     ensStatus = -1;
+  }
+}
+
+void ensReset() {
+  if (ens.setOperatingMode(SFE_ENS160_RESET)) {
+    delay(100);
+    ens.setOperatingMode(SFE_ENS160_STANDARD);
   }
 }
 
