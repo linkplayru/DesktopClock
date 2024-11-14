@@ -33,7 +33,8 @@ struct tm ntpTime;
 
 //MQTT
 const char* mqttBroker = "broker";
-const char* mqttTopic = "topic";
+const char* mqttInTopic = "inTopic";
+const char* mqttOutTopic = "outTopic";
 const char* mqttUser = "user";
 const char* mqttPassword = "password";
 const int mqttPort = 1883;
@@ -80,6 +81,14 @@ float dhtHum;          //Humidity in % RH
 void lcdInit() {
   lcd.init();
   lcd.backlight();
+}
+
+void lcdBacklightOn() {
+  lcd.backlight();
+}
+
+void lcdBacklightOff() {
+  lcd.noBacklight();
 }
 
 void lcdPrintConnectingWifi() {
@@ -242,6 +251,7 @@ void wifiCheck() {
 void mqttInit() {
   mqttClient.setBufferSize(400);
   mqttClient.setServer(mqttBroker, mqttPort);
+  mqttClient.setCallback(mqttCallback);
 }
 
 void mqttCheck() {
@@ -251,7 +261,10 @@ void mqttCheck() {
       delay(500);
     }
   }
-  mqttStatus = 1;
+  if (mqttStatus == 0) {
+    mqttClient.subscribe(mqttInTopic);
+    mqttStatus = 1;
+  }
   mqttClient.loop();
   mqttSend();
 }
@@ -280,7 +293,19 @@ void mqttSend() {
   ,
   ntpTime.tm_year + 1900, ntpTime.tm_mon + 1, ntpTime.tm_mday, ntpTime.tm_hour, ntpTime.tm_min, ntpTime.tm_sec, ntpTime.tm_wday + 1, ntpTime.tm_yday + 1
   , ensStatus, ensAQI, ensTVOC, ensECO2, ahtStatus, ahtTemp, ahtHum, dhtTemp, dhtHum);
-  mqttClient.publish(mqttTopic, mqttBuffer);
+  mqttClient.publish(mqttOutTopic, mqttBuffer);
+}
+
+void mqttCallback(char* topic, byte* payload, unsigned int length) {
+  String message;
+  for (int i = 0; i < length; i++) {
+    message += (char)payload[i];
+  }
+  if (message == "backlight off") {
+    lcdBacklightOff();
+  } else if (message == "backlight on") {
+    lcdBacklightOn();
+  }
 }
 
 void ntpInit() {
@@ -394,5 +419,4 @@ void loop() {
     lcdPrintMain(dhtTemp, dhtHum, ensECO2, wifiStatus, ensAQI, ensStatus);
     lcdTaskPrevMillis = currMillis;
   }
-  //delay(100);
 }
