@@ -21,6 +21,13 @@ unsigned long dhtTaskCheckInterval = 1000;
 unsigned long lcdTaskPrevMillis = 0;
 unsigned long lcdTaskCheckInterval = 100;
 
+//Sleep
+boolean sleepMode = false;
+unsigned long sleepTaskPrevMillis = 0;
+unsigned long sleepTaskCheckInterval = 60000;
+uint8_t sleepTaskCount = 0;
+uint8_t sleepTaskTarget = 0;
+
 //WiFi
 const char* wifiSsid  = "ssid";
 const char* wifiPass = "password";
@@ -79,6 +86,22 @@ float ahtTemp;         //Temperature in Celsius
 float ahtHum;          //Humidity in % RH
 float dhtTemp;         //Temperature in Celsius
 float dhtHum;          //Humidity in % RH
+
+void modeSleep(uint8_t timeInMinutes) {
+  sleepTaskPrevMillis = millis();
+  sleepTaskCount = 0;
+  sleepTaskTarget = timeInMinutes;
+  sleepMode = true;
+  WiFi.disconnect(true);
+  WiFi.mode(WIFI_OFF);
+}
+
+void modeWork() {
+  sleepMode = false;
+  WiFi.disconnect(false);
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(wifiSsid, wifiPass);
+}
 
 void lcdInit() {
   lcd.init();
@@ -257,18 +280,22 @@ void mqttInit() {
 }
 
 void mqttCheck() {
-  while(!mqttClient.connected()) {
+  if (!mqttClient.connected()) {
     mqttStatus = 0;
+  }
+  if (wifiStatus == WL_CONNECTED && mqttStatus == 0) {
     if (!mqttClient.connect("DesktopClock", mqttUser, mqttPassword)) {
       delay(500);
     }
   }
-  if (mqttStatus == 0) {
-    mqttClient.subscribe(mqttInTopic);
-    mqttStatus = 1;
+  if (mqttClient.connected()) {
+    if (mqttStatus == 0) {
+      mqttStatus = 1;
+      mqttClient.subscribe(mqttInTopic);
+    }
+    mqttClient.loop();
+    mqttSend();
   }
-  mqttClient.loop();
-  mqttSend();
 }
 
 void mqttSend() {
@@ -309,6 +336,9 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     lcdBacklightOn();
   } else if (message == "ens reset") {
     ensReset();
+  } else if (message.startsWith("sleep")) {
+    int param = message.substring(6).toInt();
+    modeSleep(param);
   }
 }
 
@@ -402,6 +432,15 @@ void setup() {
 
 void loop() {
   unsigned long currMillis = millis();
+  if (sleepMode) {
+    if (currMillis - sleepTaskPrevMillis > sleepTaskCheckInterval) {
+      sleepTaskCount++;
+      if (sleepTaskCount >= sleepTaskTarget) {
+        modeWork();
+      }
+      sleepTaskPrevMillis = currMillis;
+    }
+  }
   if (currMillis - wifiTaskPrevMillis > wifiTaskCheckInterval) {
     wifiCheck();
     wifiTaskPrevMillis = currMillis;
