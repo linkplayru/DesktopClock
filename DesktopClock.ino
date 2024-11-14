@@ -22,7 +22,7 @@ unsigned long lcdTaskPrevMillis = 0;
 unsigned long lcdTaskCheckInterval = 100;
 
 //Sleep
-boolean sleepMode = false;
+bool sleepMode = false;
 unsigned long sleepTaskPrevMillis = 0;
 unsigned long sleepTaskCheckInterval = 60000;
 uint8_t sleepTaskCount = 0;
@@ -71,6 +71,7 @@ byte lcd_char_aqi4[8] = {B00000, B00000, B01010, B01010, B00000, B01110, B10001,
 byte lcd_char_aqi5[8] = {B00000, B00000, B11011, B01010, B00000, B01110, B10001, B00000};
 uint8_t lcd_digits_up[12] = {1, 3, 4, 4, 2, 5, 5, 6, 7, 7, 46, 32};
 uint8_t lcd_digits_dn[12] = {2, 3, 5, 4, 6, 4, 7, 3, 7, 4, 46, 32};
+bool lcdBacklightStatus = false;
 
 //Modules
 SparkFun_ENS160 ens;
@@ -106,14 +107,17 @@ void modeWork() {
 void lcdInit() {
   lcd.init();
   lcd.backlight();
+  lcdBacklightStatus = true;
 }
 
 void lcdBacklightOn() {
   lcd.backlight();
+  lcdBacklightStatus = true;
 }
 
 void lcdBacklightOff() {
   lcd.noBacklight();
+  lcdBacklightStatus = false;
 }
 
 void lcdPrintConnectingWifi() {
@@ -317,11 +321,12 @@ void mqttSend() {
   "  \"ahtTemp\": %0.1f,\n"
   "  \"ahtHum\": %0.1f,\n"
   "  \"dhtTemp\": %0.1f,\n"
-  "  \"dhtHum\": %0.1f\n"
+  "  \"dhtHum\": %0.1f,\n"
+  "  \"backlight\": %d\n"
   "}"
   ,
   ntpTime.tm_year + 1900, ntpTime.tm_mon + 1, ntpTime.tm_mday, ntpTime.tm_hour, ntpTime.tm_min, ntpTime.tm_sec, ntpTime.tm_wday + 1, ntpTime.tm_yday + 1
-  , ensStatus, ensAQI, ensTVOC, ensECO2, ahtStatus, ahtTemp, ahtHum, dhtTemp, dhtHum);
+  , ensStatus, ensAQI, ensTVOC, ensECO2, ahtStatus, ahtTemp, ahtHum, dhtTemp, dhtHum, lcdBacklightStatus);
   mqttClient.publish(mqttOutTopic, mqttBuffer);
 }
 
